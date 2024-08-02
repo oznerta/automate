@@ -1,0 +1,12 @@
+{
+  "portalUrl": "https://apps.educlaas.omnilearnlms.sambaash.com/learning/course/course-v1:EDUCLaaS+API+ECSG-BDSE-API-0923-15Jul2024/block-v1:EDUCLaaS+API+ECSG-BDSE-API-0923-15Jul2024+type@sequential+block@2971471030c34950bb8fc75e4e5ae76c/block-v1:EDUCLaaS+API+ECSG-BDSE-API-0923-15Jul2024+type@vertical+block@34c1f9d99297417e9c036d898d8f41ed",
+  "eventTimes": [
+    "09:00am - 11:30am",
+    "11:30am - 01:00pm",
+    "02:00pm - 03:00pm",
+    "03:00pm - 04:30pm",
+    "04:30pm - 06:00pm"
+  ],
+  "userDataDir": "C:\\Users\\Matt\\AppData\\Local\\Microsoft\\Edge\\User Data\\Profile 1",
+  "chromeExecutablePath": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+}
