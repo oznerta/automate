@@ -2,7 +2,7 @@ const puppeteer = require("puppeteer");
 const path = require("path");
 const fs = require("fs");
 const moment = require("moment");
-const Tesseract = require('tesseract.js');
+const Tesseract = require("tesseract.js");
 
 const config = require("./config.json");
 
@@ -14,43 +14,49 @@ async function logError(message) {
 
 async function recognizeText(imagePath) {
   try {
-    const { data: { text } } = await Tesseract.recognize(imagePath, 'eng');
+    const {
+      data: { text }
+    } = await Tesseract.recognize(imagePath, "eng");
     return text;
   } catch (error) {
     console.error("Error recognizing text:", error.message);
-    await logError(`Error recognizing text: ${error.message}\nStack: ${error.stack}`);
+    await logError(
+      `Error recognizing text: ${error.message}\nStack: ${error.stack}`
+    );
     return "";
   }
 }
 
 function getNextMeetingWaitDuration(eventTimes) {
   const currentTime = moment();
-  const meetingTimes = eventTimes.map(timeRange => {
-    const [startTime, endTime] = timeRange.split(' - ').map(time => moment(time, 'hh:mm A'));
+  const meetingTimes = eventTimes.map((timeRange) => {
+    const [startTime, endTime] = timeRange
+      .split(" - ")
+      .map((time) => moment(time, "hh:mm A"));
     return { startTime, endTime };
   });
 
-  const upcomingMeeting = meetingTimes.find(meeting => currentTime.isBefore(meeting.startTime));
+  const upcomingMeeting = meetingTimes.find((meeting) =>
+    currentTime.isBefore(meeting.startTime)
+  );
   if (upcomingMeeting) {
     const timeUntilMeeting = upcomingMeeting.startTime.diff(currentTime);
     return timeUntilMeeting > 0 ? timeUntilMeeting : 0;
   }
 
-  const firstMeetingTomorrow = moment(eventTimes[0].split(' - ')[0], 'hh:mm A').add(1, 'day');
+  const firstMeetingTomorrow = moment(
+    eventTimes[0].split(" - ")[0],
+    "hh:mm A"
+  ).add(1, "day");
   const timeUntilFirstMeetingTomorrow = firstMeetingTomorrow.diff(currentTime);
   return timeUntilFirstMeetingTomorrow;
 }
 
 async function runAutomation(browser) {
   let page;
-  
-  try {
-    if (!page) {
-      page = await browser.newPage();
-    } else {
-      await page.bringToFront();
-    }
 
+  try {
+    page = await browser.newPage();
     console.log("Navigating to the URL...");
     await page.goto(config.portalUrl, {
       waitUntil: "networkidle2",
@@ -101,7 +107,9 @@ async function runAutomation(browser) {
     console.log("Finding the event matching the current time...");
     const events = await innerIframe.$$eval("a.fc-daygrid-event", (nodes) => {
       return nodes.map((node) => {
-        const timeText = node.querySelector(".fc-event-time").textContent.trim();
+        const timeText = node
+          .querySelector(".fc-event-time")
+          .textContent.trim();
         const [start, end] = timeText.split(" - ");
         const title = node.querySelector(".fc-event-title").textContent.trim();
         const href = node.getAttribute("href");
@@ -123,7 +131,10 @@ async function runAutomation(browser) {
       console.log(
         `Comparing event: ${event.title} (${event.startTime} - ${event.endTime})`
       );
-      return currentTime.isBetween(eventStartTime.subtract(5, 'minutes'), eventEndTime);
+      return currentTime.isBetween(
+        eventStartTime.subtract(5, "minutes"),
+        eventEndTime
+      );
     });
 
     if (matchingEvent) {
@@ -159,15 +170,17 @@ async function runAutomation(browser) {
         );
         const newPage = await newPagePromise;
 
-        console.log('Taking screenshot of the new page...');
+        console.log("Taking screenshot of the new page...");
         await newPage.screenshot({ path: "new-page.png" });
 
-        console.log('Recognizing text on the new page...');
+        console.log("Recognizing text on the new page...");
         const text = await recognizeText("new-page.png");
         console.log(`Recognized text: ${text}`);
 
         console.log('Waiting for "Continue on this browser" button...');
-        await newPage.waitForSelector('button[data-tid="joinOnWeb"]', { visible: true });
+        await newPage.waitForSelector('button[data-tid="joinOnWeb"]', {
+          visible: true
+        });
 
         console.log('"Continue on this browser" button found. Clicking...');
         await newPage.evaluate(() => {
@@ -179,29 +192,40 @@ async function runAutomation(browser) {
         console.log('Clicked "Continue on this browser" button.');
 
         console.log('Waiting for "Join now" button...');
-        await newPage.waitForSelector('button#prejoin-join-button', { visible: true });
+        await newPage.waitForSelector("button#prejoin-join-button", {
+          visible: true
+        });
+
+        console.log("Checking microphone status...");
+        await newPage.evaluate(() => {
+          const micButton = document.querySelector(
+            'div[data-tid="toggle-mute"]'
+          );
+          const micState = document.querySelector(
+            "#calling-prejoin-mic-state-id"
+          );
+          if (
+            micButton &&
+            micState &&
+            micState.textContent.includes("Mic on")
+          ) {
+            micButton.click();
+            console.log("Microphone muted.");
+          } else {
+            console.log("Microphone already muted or elements not found.");
+          }
+        });
 
         console.log('"Join now" button found. Clicking...');
         await newPage.evaluate(() => {
-          const joinButton = document.querySelector('button#prejoin-join-button');
+          const joinButton = document.querySelector(
+            "button#prejoin-join-button"
+          );
           if (joinButton) {
             joinButton.click();
           }
         });
         console.log('Clicked "Join now" button.');
-
-        // Handle muting the microphone here if needed
-        console.log("Waiting for microphone button...");
-        await newPage.waitForSelector('button#microphone-button', { visible: true });
-        const isMicMuted = await newPage.evaluate(() => {
-          const micButton = document.querySelector('button#microphone-button');
-          return micButton && micButton.getAttribute('aria-label').includes('Unmute mic');
-        });
-
-        if (!isMicMuted) {
-          console.log("Mic is not muted. Muting...");
-          await newPage.click('button#microphone-button');
-        }
 
       } catch (error) {
         console.error(
@@ -227,14 +251,13 @@ async function runAutomation(browser) {
   try {
     while (true) {
       try {
-        if (browser && !browser.isClosed()) {
+        if (browser) {
           console.log("Closing all browser tabs...");
           const pages = await browser.pages();
           for (const page of pages) {
-            if (page.url() === 'about:blank') {
+            if (page.url() === "about:blank") {
               await page.close();
             }
-            await page.close();
           }
           console.log("All tabs closed.");
           await browser.close();
@@ -248,8 +271,9 @@ async function runAutomation(browser) {
           args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
-            '--no-protocol-handler',
-            "--window-size=1920,1080"
+            "--no-protocol-handler",
+            "--start-maximized",
+            "--no-first-run"
           ],
           defaultViewport: null
         });
@@ -257,15 +281,23 @@ async function runAutomation(browser) {
         await runAutomation(browser);
       } catch (error) {
         console.error("Error during automation run:", error.message);
-        await logError(`Error during automation run: ${error.message}\nStack: ${error.stack}`);
+        await logError(
+          `Error during automation run: ${error.message}\nStack: ${error.stack}`
+        );
       }
 
       const checkInterval = getNextMeetingWaitDuration(config.eventTimes);
-      console.log(`Waiting for ${moment.duration(checkInterval).humanize()} before next run...`);
-      await new Promise(resolve => setTimeout(resolve, checkInterval));
+      console.log(
+        `Waiting for ${moment
+          .duration(checkInterval)
+          .humanize()} before next run...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, checkInterval));
     }
   } catch (error) {
     console.error("Error launching browser:", error.message);
-    await logError(`Error launching browser: ${error.message}\nStack: ${error.stack}`);
+    await logError(
+      `Error launching browser: ${error.message}\nStack: ${error.stack}`
+    );
   }
 })();
